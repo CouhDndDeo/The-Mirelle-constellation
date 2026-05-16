@@ -74,8 +74,8 @@
 
   <script>
     // размеры изображения
-    const imageWidth = 4146;
-    const imageHeight = 2354;
+    const imageWidth = 4096;
+    const imageHeight = 2304;
     const extent = [0, 0, imageWidth, imageHeight];
 
     const projection = new ol.proj.Projection({
@@ -84,7 +84,7 @@
       extent: extent,
     });
 
-    const imageUrl = 'https://raw.githubusercontent.com/CouhDndDeo/noskap/main/noskapmap.png';
+    const imageUrl = 'https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/The Mirelle constellation.png';
 
     const map = new ol.Map({
   target: 'map',
@@ -115,7 +115,7 @@
     });
 
     // грузим точки из JSON
-    fetch("https://raw.githubusercontent.com/CouhDndDeo/noskap/main/locations.json")
+    fetch("https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/locations.json")
       .then(r => r.json())
       .then(locations => {
         locations.forEach(loc => {
