@@ -592,6 +592,8 @@
     <button class="control-btn control-btn-small" id="fog-of-war-btn" aria-label="Туман войны" title="Туман войны">🌫️</button>
     <button class="control-btn control-btn-small" id="encounter-btn" aria-label="Случайная встреча" title="Случайная встреча">🎲</button>
     <button class="control-btn control-btn-small" id="weather-btn" aria-label="Погода" title="Погода">⛈️</button>
+    <button class="control-btn control-btn-small" id="add-marker-btn" aria-label="Добавить метку" title="Добавить свою метку">📍</button>
+    <button class="control-btn control-btn-small" id="share-mode-btn" aria-label="Режим обмена" title="Поделиться метками">🔗</button>
   </div>
 
   <!-- ИЗМЕРИТЕЛЬ РАССТОЯНИЙ -->
@@ -603,6 +605,59 @@
       <button class="distance-btn" id="distance-clear">Очистить</button>
       <button class="distance-btn" id="distance-close">Закрыть</button>
     </div>
+  </div>
+
+  <!-- ПАНЕЛЬ ДОБАВЛЕНИЯ МЕТКИ -->
+  <div id="add-marker-panel" class="encounter-panel" role="dialog" aria-label="Добавить метку">
+    <h3>📍 Добавить метку</h3>
+    <div style="margin-bottom: 10px;">
+      <label for="marker-name" style="display:block; margin-bottom:4px; font-size:13px;">Название:</label>
+      <input type="text" id="marker-name" placeholder="Например: Лагерь партии" 
+             style="width:100%; padding:6px; border:2px solid var(--parchment-border); border-radius:4px; font-family:'IM Fell English',serif; font-size:13px; background:var(--parchment-bg);">
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label for="marker-desc" style="display:block; margin-bottom:4px; font-size:13px;">Описание:</label>
+      <textarea id="marker-desc" placeholder="Заметки о месте..." rows="2"
+                style="width:100%; padding:6px; border:2px solid var(--parchment-border); border-radius:4px; font-family:'IM Fell English',serif; font-size:13px; background:var(--parchment-bg); resize:vertical;"></textarea>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label for="marker-type" style="display:block; margin-bottom:4px; font-size:13px;">Тип:</label>
+      <select id="marker-type" style="width:100%; padding:6px; border:2px solid var(--parchment-border); border-radius:4px; font-family:'IM Fell English',serif; font-size:13px; background:var(--parchment-bg);">
+        <option value="user">Пользовательская</option>
+        <option value="character">Персонаж</option>
+        <option value="camp">Лагерь</option>
+        <option value="landmark">Ориентир</option>
+        <option value="danger">Опасность</option>
+      </select>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label for="marker-color" style="display:block; margin-bottom:4px; font-size:13px;">Цвет:</label>
+      <input type="color" id="marker-color" value="#e74c3c" style="width:100%; height:35px; border:2px solid var(--parchment-border); border-radius:4px; cursor:pointer;">
+    </div>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <button class="encounter-btn" id="marker-save" style="flex:1;">Сохранить</button>
+      <button class="encounter-btn" id="marker-cancel" style="flex:1;">Отмена</button>
+    </div>
+    <div style="margin-top:12px; padding-top:10px; border-top:1px dashed var(--parchment-border);">
+      <button class="encounter-btn" id="marker-share" style="width:100%;">🔗 Поделиться меткой</button>
+    </div>
+  </div>
+
+  <!-- ПАНЕЛЬ ОБМЕНА ДАННЫМИ -->
+  <div id="share-panel" class="encounter-panel" role="dialog" aria-label="Обмен данными">
+    <h3>🔗 Обмен метками</h3>
+    <p style="font-size:13px; margin-bottom:10px;">Экспортируйте свои метки для сопартийцев или импортируйте данные от мастера.</p>
+    <div style="margin-bottom:10px;">
+      <button class="encounter-btn" id="export-markers" style="width:100%; margin-bottom:8px;">📤 Экспорт всех меток</button>
+      <button class="encounter-btn" id="import-markers" style="width:100%;">📥 Импорт меток</button>
+    </div>
+    <div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--parchment-border);">
+      <label for="import-data" style="display:block; margin-bottom:4px; font-size:12px;">Вставьте данные для импорта:</label>
+      <textarea id="import-data" placeholder="Вставьте JSON данные здесь..." rows="3"
+                style="width:100%; padding:6px; border:2px solid var(--parchment-border); border-radius:4px; font-family:monospace; font-size:11px; background:var(--parchment-bg); resize:vertical;"></textarea>
+      <button class="encounter-btn" id="import-apply" style="width:100%; margin-top:8px;">Применить импорт</button>
+    </div>
+    <button class="encounter-btn" id="share-close" style="margin-top:10px; width:100%;">Закрыть</button>
   </div>
 
   <!-- ГЕНЕРАТОР ВСТРЕЧ -->
@@ -724,6 +779,10 @@
     // ===== ВЕКТОРНЫЙ СЛОЙ С МАРКЕРАМИ =====
     const vectorSource = new ol.source.Vector();
     
+    // Хранилище пользовательских меток
+    let userMarkers = [];
+    const USER_MARKERS_STORAGE_KEY = 'noscape_user_markers';
+    
     // Кэширование стиля иконки для оптимизации производительности
     const pinIcon = new ol.style.Icon({
       src: CONFIG.pinIconUrl,
@@ -734,6 +793,105 @@
     const markerStyle = new ol.style.Style({
       image: pinIcon
     });
+
+    // ===== УПРАВЛЕНИЕ ПОЛЬЗОВАТЕЛЬСКИМИ МЕТКАМИ =====
+    function loadUserMarkers() {
+      try {
+        const saved = localStorage.getItem(USER_MARKERS_STORAGE_KEY);
+        if (saved) {
+          userMarkers = JSON.parse(saved);
+          userMarkers.forEach(markerData => {
+            addMarkerToMap(markerData, false);
+          });
+        }
+      } catch (e) {
+        console.warn('Не удалось загрузить пользовательские метки:', e);
+      }
+    }
+    
+    function saveUserMarkers() {
+      try {
+        localStorage.setItem(USER_MARKERS_STORAGE_KEY, JSON.stringify(userMarkers));
+      } catch (e) {
+        console.warn('Не удалось сохранить пользовательские метки:', e);
+      }
+    }
+    
+    function addMarkerToMap(markerData, save = true) {
+      const { x, y, name, description, type, color } = markerData;
+      
+      const feature = new ol.Feature({
+        geometry: new ol.geom.Point([x, y]),
+        type: type || 'user',
+        name: name,
+        description: description,
+        color: color,
+        isUserMarker: true
+      });
+      
+      const fillColor = color || '#e74c3c';
+      feature.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 10,
+          fill: new ol.style.Fill({ color: fillColor }),
+          stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+        })
+      }));
+      
+      vectorSource.addFeature(feature);
+      
+      if (save) {
+        userMarkers.push(markerData);
+        saveUserMarkers();
+      }
+      
+      return feature;
+    }
+    
+    function removeUserMarker(feature) {
+      const coord = feature.getGeometry().getCoordinates();
+      userMarkers = userMarkers.filter(m => m.x !== coord[0] || m.y !== coord[1]);
+      vectorSource.removeFeature(feature);
+      saveUserMarkers();
+    }
+    
+    function exportUserMarkers() {
+      return JSON.stringify({
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        markers: userMarkers
+      }, null, 2);
+    }
+    
+    function importUserMarkers(jsonData) {
+      try {
+        const data = JSON.parse(jsonData);
+        if (!data.markers || !Array.isArray(data.markers)) {
+          throw new Error('Неверный формат данных');
+        }
+        
+        let importedCount = 0;
+        data.markers.forEach(markerData => {
+          if (validateMarkerData(markerData)) {
+            addMarkerToMap(markerData, true);
+            importedCount++;
+          }
+        });
+        
+        return importedCount;
+      } catch (e) {
+        console.error('Ошибка импорта меток:', e);
+        throw e;
+      }
+    }
+    
+    function validateMarkerData(data) {
+      if (!data || typeof data !== 'object') return false;
+      if (typeof data.x !== 'number' || typeof data.y !== 'number') return false;
+      if (data.x < 0 || data.x > imageWidth || data.y < 0 || data.y > imageHeight) return false;
+      if (typeof data.name !== 'string' || data.name.trim() === '') return false;
+      return true;
+    }
 
     // ===== ЛОКАЛЬНОЕ ХРАНЕНИЕ ДАННЫХ =====
     function saveMapState() {
@@ -919,12 +1077,53 @@
       if (feature && feature.get('name')) {
         const coord = feature.getGeometry().getCoordinates();
         popupOverlay.setPosition(coord);
-        popupTitle.textContent = feature.get('name');
-        popupDesc.textContent = feature.get('desc') || 'Нет описания';
+        
+        // Добавляем кнопку удаления для пользовательских меток
+        const isUserMarker = feature.get('isUserMarker');
+        let descHtml = feature.get('desc') || 'Нет описания';
+        
+        if (isUserMarker) {
+          const typeLabel = {
+            'user': 'Пользовательская',
+            'character': 'Персонаж',
+            'camp': 'Лагерь',
+            'landmark': 'Ориентир',
+            'danger': 'Опасность'
+          }[feature.get('type')] || 'Метка';
+          
+          const color = feature.get('color') || '#e74c3c';
+          descHtml = `
+            <div style="margin-bottom:8px;">${descHtml}</div>
+            <div style="font-size:12px; color:#6b5344;">
+              <div>Тип: ${typeLabel}</div>
+              <div style="display:flex; align-items:center; gap:6px; margin-top:4px;">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:2px; background:${color}; border:1px solid #8b4513;"></span>
+                <span>Цвет: ${color}</span>
+              </div>
+            </div>
+            <button id="delete-marker-btn" style="margin-top:10px; width:100%; padding:6px; background:#ffebee; border:2px solid #e74c3c; border-radius:4px; color:#e74c3c; cursor:pointer; font-family:'IM Fell English',serif; font-size:12px;">🗑️ Удалить метку</button>
+          `;
+        }
+        
+        popupDesc.innerHTML = descHtml;
         
         // Фокус на попап для скринридеров
         popup.setAttribute('tabindex', '-1');
         popup.focus();
+        
+        // Обработчик удаления для пользовательских меток
+        if (isUserMarker) {
+          setTimeout(() => {
+            const deleteBtn = document.getElementById('delete-marker-btn');
+            if (deleteBtn) {
+              deleteBtn.addEventListener('click', () => {
+                removeUserMarker(feature);
+                popupOverlay.setPosition(undefined);
+                coordsDiv.textContent = 'Метка удалена!';
+              });
+            }
+          }, 0);
+        }
       } else {
         popupOverlay.setPosition(undefined);
       }
@@ -1051,15 +1250,20 @@
         }
         
         const feet = Math.round(totalPixels / PIXELS_PER_FOOT);
-        const meters = Math.round(feet * 0.3048);
-        distanceValue.textContent = `${feet} ft (~${meters} м)`;
+        const meters = feet * 0.3048;
+        const kilometers = meters >= 1000 ? (meters / 1000).toFixed(2) : Math.round(meters);
+        const unitLabel = meters >= 1000 ? 'км' : 'м';
+        distanceValue.textContent = `${feet} ft (~${kilometers} ${unitLabel})`;
       }
     });
 
-    // ===== ТУМАН ВОЙНЫ (D&D) =====
+    // ===== ТУМАН ВОЙНЫ (D&D) - ОПТИМИЗИРОВАННЫЙ =====
     const fogOfWarBtn = document.getElementById('fog-of-war-btn');
     let fogOfWarActive = false;
     let fogOverlay = null;
+    let fogAnimationFrame = null;
+    let lastFogUpdate = 0;
+    const FOG_UPDATE_INTERVAL = 100; // мс между обновлениями
     
     fogOfWarBtn.addEventListener('click', () => {
       fogOfWarActive = !fogOfWarActive;
@@ -1079,41 +1283,74 @@
         });
         map.addOverlay(fogOverlay);
         
-        const updateFog = () => {
+        const updateFog = (timestamp) => {
+          // Ограничиваем частоту обновлений
+          if (timestamp - lastFogUpdate < FOG_UPDATE_INTERVAL) {
+            fogAnimationFrame = requestAnimationFrame(updateFog);
+            return;
+          }
+          lastFogUpdate = timestamp;
+          
           const size = map.getSize();
+          const view = map.getView();
+          const resolution = view.getResolution();
+          
+          // Адаптивный размер видимости в зависимости от зума
+          const baseRadius = 150;
+          const visibilityRadius = Math.max(baseRadius * (1 / resolution), 50);
+          
           fogCanvas.width = size[0];
           fogCanvas.height = size[1];
           
           // Заполняем чёрным с прозрачностью
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
           ctx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
           
-          // Вырезаем круги видимости для каждого персонажа (пример)
+          // Вырезаем круги видимости для каждого персонажа
           ctx.globalCompositeOperation = 'destination-out';
           
-          // Получаем все маркеры персонажей (можно расширить логику)
-          vectorSource.getFeatures().forEach(f => {
-            if (f.get('type') === 'character') {
+          // Получаем все маркеры персонажей
+          const characterFeatures = vectorSource.getFeatures().filter(f => f.get('type') === 'character');
+          
+          if (characterFeatures.length === 0) {
+            // Если нет персонажей, показываем центр карты
+            const centerCoord = view.getCenter();
+            const centerPixel = map.getPixelFromCoordinate(centerCoord);
+            if (centerPixel) {
+              const gradient = ctx.createRadialGradient(centerPixel[0], centerPixel[1], 0, centerPixel[0], centerPixel[1], visibilityRadius);
+              gradient.addColorStop(0, 'rgba(0,0,0,1)');
+              gradient.addColorStop(1, 'rgba(0,0,0,0)');
+              ctx.fillStyle = gradient;
+              ctx.beginPath();
+              ctx.arc(centerPixel[0], centerPixel[1], visibilityRadius, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          } else {
+            characterFeatures.forEach(f => {
               const coord = f.getGeometry().getCoordinates();
               const pixel = map.getPixelFromCoordinate(coord);
               if (pixel) {
-                const gradient = ctx.createRadialGradient(pixel[0], pixel[1], 0, pixel[0], pixel[1], 150);
+                const gradient = ctx.createRadialGradient(pixel[0], pixel[1], 0, pixel[0], pixel[1], visibilityRadius);
                 gradient.addColorStop(0, 'rgba(0,0,0,1)');
                 gradient.addColorStop(1, 'rgba(0,0,0,0)');
                 ctx.fillStyle = gradient;
                 ctx.beginPath();
-                ctx.arc(pixel[0], pixel[1], 150, 0, Math.PI * 2);
+                ctx.arc(pixel[0], pixel[1], visibilityRadius, 0, Math.PI * 2);
                 ctx.fill();
               }
-            }
-          });
+            });
+          }
           
           ctx.globalCompositeOperation = 'source-over';
+          fogAnimationFrame = requestAnimationFrame(updateFog);
         };
         
-        map.on('postrender', updateFog);
-        updateFog();
+        fogAnimationFrame = requestAnimationFrame(updateFog);
       } else {
+        if (fogAnimationFrame) {
+          cancelAnimationFrame(fogAnimationFrame);
+          fogAnimationFrame = null;
+        }
         if (fogOverlay) {
           map.removeOverlay(fogOverlay);
           fogOverlay = null;
@@ -1200,6 +1437,161 @@
       }
     } catch (e) {}
 
+    // ===== ДОБАВЛЕНИЕ ПОЛЬЗОВАТЕЛЬСКИХ МЕТОК =====
+    const addMarkerBtn = document.getElementById('add-marker-btn');
+    const addMarkerPanel = document.getElementById('add-marker-panel');
+    const markerNameInput = document.getElementById('marker-name');
+    const markerDescInput = document.getElementById('marker-desc');
+    const markerTypeSelect = document.getElementById('marker-type');
+    const markerColorInput = document.getElementById('marker-color');
+    const markerSaveBtn = document.getElementById('marker-save');
+    const markerCancelBtn = document.getElementById('marker-cancel');
+    const markerShareBtn = document.getElementById('marker-share');
+    
+    let pendingMarkerCoord = null;
+    
+    addMarkerBtn.addEventListener('click', () => {
+      addMarkerPanel.classList.toggle('visible');
+      if (addMarkerPanel.classList.contains('visible')) {
+        coordsDiv.textContent = 'Кликните по карте для выбора места метки';
+        map.getTargetElement().style.cursor = 'crosshair';
+      } else {
+        map.getTargetElement().style.cursor = '';
+        pendingMarkerCoord = null;
+      }
+    });
+    
+    // Обработка клика по карте при добавлении метки
+    map.on('singleclick', (evt) => {
+      if (addMarkerPanel.classList.contains('visible')) {
+        pendingMarkerCoord = evt.coordinate;
+        coordsDiv.textContent = `Выбрано: x=${Math.round(evt.coordinate[0])}, y=${Math.round(evt.coordinate[1])}`;
+      }
+    });
+    
+    markerSaveBtn.addEventListener('click', () => {
+      if (!pendingMarkerCoord) {
+        alert('Сначала выберите место на карте!');
+        return;
+      }
+      
+      const name = markerNameInput.value.trim();
+      if (!name) {
+        alert('Введите название метки!');
+        return;
+      }
+      
+      const markerData = {
+        x: Math.round(pendingMarkerCoord[0]),
+        y: Math.round(pendingMarkerCoord[1]),
+        name: name,
+        description: markerDescInput.value.trim(),
+        type: markerTypeSelect.value,
+        color: markerColorInput.value
+      };
+      
+      addMarkerToMap(markerData, true);
+      
+      // Сброс и закрытие
+      markerNameInput.value = '';
+      markerDescInput.value = '';
+      markerColorInput.value = '#e74c3c';
+      markerTypeSelect.value = 'user';
+      addMarkerPanel.classList.remove('visible');
+      map.getTargetElement().style.cursor = '';
+      pendingMarkerCoord = null;
+      coordsDiv.textContent = 'Метка добавлена!';
+    });
+    
+    markerCancelBtn.addEventListener('click', () => {
+      addMarkerPanel.classList.remove('visible');
+      map.getTargetElement().style.cursor = '';
+      pendingMarkerCoord = null;
+      coordsDiv.textContent = 'Кликните по карте для получения координат';
+    });
+    
+    markerShareBtn.addEventListener('click', () => {
+      if (!pendingMarkerCoord) {
+        alert('Сначала выберите место на карте!');
+        return;
+      }
+      
+      const name = markerNameInput.value.trim() || 'Без названия';
+      const markerData = {
+        x: Math.round(pendingMarkerCoord[0]),
+        y: Math.round(pendingMarkerCoord[1]),
+        name: name,
+        description: markerDescInput.value.trim(),
+        type: markerTypeSelect.value,
+        color: markerColorInput.value
+      };
+      
+      const shareData = JSON.stringify({
+        version: 1,
+        markers: [markerData]
+      }, null, 2);
+      
+      // Копируем в буфер обмена
+      navigator.clipboard.writeText(shareData).then(() => {
+        alert('Данные метки скопированы в буфер обмена! Теперь вы можете отправить их сопартийцам.');
+      }).catch(() => {
+        prompt('Скопируйте данные вручную:', shareData);
+      });
+    });
+
+    // ===== ОБМЕН ДАННЫМИ (ЭКСПОРТ/ИМПОРТ) =====
+    const shareModeBtn = document.getElementById('share-mode-btn');
+    const sharePanel = document.getElementById('share-panel');
+    const exportMarkersBtn = document.getElementById('export-markers');
+    const importMarkersBtn = document.getElementById('import-markers');
+    const importApplyBtn = document.getElementById('import-apply');
+    const importDataInput = document.getElementById('import-data');
+    const shareCloseBtn = document.getElementById('share-close');
+    
+    shareModeBtn.addEventListener('click', () => {
+      sharePanel.classList.toggle('visible');
+    });
+    
+    shareCloseBtn.addEventListener('click', () => {
+      sharePanel.classList.remove('visible');
+    });
+    
+    exportMarkersBtn.addEventListener('click', () => {
+      const exportData = exportUserMarkers();
+      
+      navigator.clipboard.writeText(exportData).then(() => {
+        alert('Все метки экспортированы и скопированы в буфер обмена!');
+      }).catch(() => {
+        prompt('Скопируйте данные вручную:', exportData);
+      });
+    });
+    
+    importMarkersBtn.addEventListener('click', () => {
+      importDataInput.value = '';
+      importDataInput.focus();
+    });
+    
+    importApplyBtn.addEventListener('click', () => {
+      const data = importDataInput.value.trim();
+      if (!data) {
+        alert('Вставьте данные для импорта!');
+        return;
+      }
+      
+      try {
+        const count = importUserMarkers(data);
+        if (count > 0) {
+          alert(`Успешно импортировано ${count} меток!`);
+          importDataInput.value = '';
+          sharePanel.classList.remove('visible');
+        } else {
+          alert('Нет подходящих данных для импорта.');
+        }
+      } catch (e) {
+        alert('Ошибка импорта: ' + e.message);
+      }
+    });
+
     // ===== ВЫВОД КООРДИНАТ ПРИ КЛИКЕ =====
     const coordsDiv = document.getElementById('coords');
     map.on('singleclick', (evt) => {
@@ -1216,6 +1608,9 @@
     });
 
     // ===== АВТО-FIT КАРТЫ ПРИ ЗАГРУЗКЕ =====
+    // Загружаем пользовательские метки
+    loadUserMarkers();
+    
     // Сначала пробуем загрузить сохранённое состояние
     if (!loadMapState()) {
       map.getView().fit(extent, {
