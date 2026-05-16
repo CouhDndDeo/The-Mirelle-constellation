@@ -204,6 +204,32 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       font-family: 'IM Fell English', serif;
       background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+      transition: max-height 0.3s ease, padding 0.3s ease;
+      overflow: hidden;
+    }
+    .legend.collapsed {
+      max-height: 48px;
+      padding: 8px 14px;
+    }
+    .legend.collapsed .legend-content {
+      display: none;
+    }
+    .legend-toggle {
+      width: 100%;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: 'Cinzel', serif;
+      font-size: 14px;
+      color: var(--text-color);
+      padding: 4px 0;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-toggle:hover {
+      color: #8b4513;
     }
     .legend h3 {
       margin: 0 0 12px 0;
@@ -593,7 +619,7 @@
   <!-- ИЗМЕРИТЕЛЬ РАССТОЯНИЙ -->
   <div id="distance-tool" class="distance-tool" role="dialog" aria-label="Измеритель расстояний">
     <div class="distance-info">
-      <span id="distance-value">0 ft (0 м)</span>
+      <span id="distance-value">0 ft (0 km)</span>
     </div>
     <div class="distance-buttons">
       <button class="distance-btn" id="distance-clear">Очистить</button>
@@ -678,48 +704,53 @@
   </div>
 
   <!-- ЛЕГЕНДА КАРТЫ -->
-  <div class="legend" role="region" aria-label="Легенда карты">
-    <h3>Условные обозначения</h3>
-    <div class="legend-item">
-      <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="" class="legend-icon" aria-hidden="true">
-      <span>Местоположение</span>
-    </div>
-    <div class="legend-section">
-      <h4>Уровни опасности</h4>
+  <div class="legend collapsed" role="region" aria-label="Легенда карты">
+    <button id="legend-toggle" class="legend-toggle" title="Условные обозначения" aria-expanded="false">
+      📜 Условные обозначения
+    </button>
+    <div class="legend-content">
+      <h3>Условные обозначения</h3>
       <div class="legend-item">
-        <div class="legend-color danger-low" aria-hidden="true"></div>
-        <span>Низкий (CR 0-2)</span>
+        <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="" class="legend-icon" aria-hidden="true">
+        <span>Местоположение</span>
       </div>
-      <div class="legend-item">
-        <div class="legend-color danger-medium" aria-hidden="true"></div>
-        <span>Средний (CR 3-6)</span>
+      <div class="legend-section">
+        <h4>Уровни опасности</h4>
+        <div class="legend-item">
+          <div class="legend-color danger-low" aria-hidden="true"></div>
+          <span>Низкий (CR 0-2)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color danger-medium" aria-hidden="true"></div>
+          <span>Средний (CR 3-6)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color danger-high" aria-hidden="true"></div>
+          <span>Высокий (CR 7-10)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color danger-extreme" aria-hidden="true"></div>
+          <span>Экстремальный (CR 11+)</span>
+        </div>
       </div>
-      <div class="legend-item">
-        <div class="legend-color danger-high" aria-hidden="true"></div>
-        <span>Высокий (CR 7-10)</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color danger-extreme" aria-hidden="true"></div>
-        <span>Экстремальный (CR 11+)</span>
-      </div>
-    </div>
-    <div class="legend-section">
-      <h4>Типы локаций</h4>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #3498db;" aria-hidden="true"></div>
-        <span>Город/Поселение</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #9b59b6;" aria-hidden="true"></div>
-        <span>Подземелье</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #f39c12;" aria-hidden="true"></div>
-        <span>Таверна/Постоялый двор</span>
-      </div>
-      <div class="legend-item">
-        <div class="legend-color" style="background: #27ae60;" aria-hidden="true"></div>
-        <span>Лес/Природа</span>
+      <div class="legend-section">
+        <h4>Типы локаций</h4>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #3498db;" aria-hidden="true"></div>
+          <span>Город/Поселение</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #9b59b6;" aria-hidden="true"></div>
+          <span>Подземелье</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #f39c12;" aria-hidden="true"></div>
+          <span>Таверна/Постоялый двор</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-color" style="background: #27ae60;" aria-hidden="true"></div>
+          <span>Лес/Природа</span>
+        </div>
       </div>
     </div>
   </div>
@@ -1198,7 +1229,7 @@
         map.getTargetElement().style.cursor = 'crosshair';
       } else {
         distancePoints = [];
-        distanceValue.textContent = '0 ft (0 м)';
+        distanceValue.textContent = '0 ft (0 km)';
         map.getTargetElement().style.cursor = '';
         // Очищаем маркеры расстояния
         vectorSource.getFeatures().forEach(f => {
@@ -1211,7 +1242,7 @@
     
     distanceClearBtn.addEventListener('click', () => {
       distancePoints = [];
-      distanceValue.textContent = '0 ft (0 м)';
+      distanceValue.textContent = '0 ft (0 km)';
       vectorSource.getFeatures().forEach(f => {
         if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
           vectorSource.removeFeature(f);
@@ -1224,7 +1255,7 @@
       distanceToolBtn.classList.remove('active');
       distanceTool.classList.remove('visible');
       distancePoints = [];
-      distanceValue.textContent = '0 ft (0 м)';
+      distanceValue.textContent = '0 ft (0 km)';
       map.getTargetElement().style.cursor = '';
       vectorSource.getFeatures().forEach(f => {
         if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
@@ -1278,10 +1309,17 @@
         }
         
         const feet = Math.round(totalPixels / PIXELS_PER_FOOT);
+        const miles = feet / 5280;
         const meters = feet * 0.3048;
-        const kilometers = meters >= 1000 ? (meters / 1000).toFixed(2) : Math.round(meters);
-        const unitLabel = meters >= 1000 ? 'км' : 'м';
-        distanceValue.textContent = `${feet} ft (~${kilometers} ${unitLabel})`;
+        const kilometers = meters / 1000;
+        
+        let displayText;
+        if (miles >= 1) {
+          displayText = `${feet.toLocaleString()} ft (~${miles.toFixed(2)} mi / ${kilometers.toFixed(2)} km)`;
+        } else {
+          displayText = `${feet.toLocaleString()} ft (~${kilometers.toFixed(3)} km)`;
+        }
+        distanceValue.textContent = displayText;
       }
     });
 
@@ -1628,6 +1666,17 @@
     // Предзагрузка иконки для ускорения отображения
     const img = new Image();
     img.src = CONFIG.pinIconUrl;
+
+    // ===== ПЕРЕКЛЮЧЕНИЕ ЛЕГЕНДЫ =====
+    const legendToggle = document.getElementById('legend-toggle');
+    const legend = document.querySelector('.legend');
+    
+    if (legendToggle && legend) {
+      legendToggle.addEventListener('click', () => {
+        const isCollapsed = legend.classList.toggle('collapsed');
+        legendToggle.setAttribute('aria-expanded', !isCollapsed);
+      });
+    }
   </script>
 </body>
 </html>
