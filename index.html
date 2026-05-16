@@ -404,7 +404,7 @@
       background: #f0e5c5;
     }
 
-    /* ===== ГЕНЕРАТОР ВСТРЕЧ ===== */
+    /* ===== ПАНЕЛИ (ГЕНЕРАТОР ВСТРЕЧ, ДОБАВЛЕНИЕ МЕТКИ И Т.Д.) ===== */
     .encounter-panel {
       position: absolute;
       top: 60px;
@@ -415,6 +415,8 @@
       padding: 14px;
       z-index: 1000;
       max-width: 280px;
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
       box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       font-family: 'IM Fell English', serif;
       display: none;
@@ -456,6 +458,17 @@
     }
     .encounter-btn:hover {
       background: #f0e5c5;
+    }
+    
+    /* Адаптивность панелей */
+    @media (max-width: 480px) {
+      .encounter-panel {
+        top: 10px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        max-height: calc(100vh - 40px);
+      }
     }
 
     /* ===== МИНИ-КАРТА ПОДЗЕМЕЛЬЯ ===== */
@@ -602,6 +615,8 @@
   <!-- СООБЩЕНИЕ ОБ ОШИБКЕ -->
   <div id="error" class="error-message" role="alert" aria-live="assertive"></div>
 
+  <!-- ОВЕРЛЕЙ ПОГОДЫ -->
+  <div id="weather-overlay" class="weather-overlay" aria-hidden="true"></div>
   <div id="map" role="application" aria-label="Интерактивная карта местоположений"></div>
 
   <!-- КНОПКИ УПРАВЛЕНИЯ -->
@@ -619,7 +634,7 @@
   <!-- ИЗМЕРИТЕЛЬ РАССТОЯНИЙ -->
   <div id="distance-tool" class="distance-tool" role="dialog" aria-label="Измеритель расстояний">
     <div class="distance-info">
-      <span id="distance-value">0 ft (0 km)</span>
+      <span id="distance-value">0 mi (0 km)</span>
     </div>
     <div class="distance-buttons">
       <button class="distance-btn" id="distance-clear">Очистить</button>
@@ -1217,7 +1232,7 @@
     
     let distanceMode = false;
     let distancePoints = [];
-    const PIXELS_PER_FOOT = 10; // 10 пикселей = 1 фут (настройте под масштаб карты)
+    const PIXELS_PER_MILE = 50; // 50 пикселей = 1 миля (настройте под масштаб карты)
     
     distanceToolBtn.addEventListener('click', () => {
       distanceMode = !distanceMode;
@@ -1229,7 +1244,7 @@
         map.getTargetElement().style.cursor = 'crosshair';
       } else {
         distancePoints = [];
-        distanceValue.textContent = '0 ft (0 km)';
+        distanceValue.textContent = '0 mi (0 km)';
         map.getTargetElement().style.cursor = '';
         // Очищаем маркеры расстояния
         vectorSource.getFeatures().forEach(f => {
@@ -1242,7 +1257,7 @@
     
     distanceClearBtn.addEventListener('click', () => {
       distancePoints = [];
-      distanceValue.textContent = '0 ft (0 km)';
+      distanceValue.textContent = '0 mi (0 km)';
       vectorSource.getFeatures().forEach(f => {
         if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
           vectorSource.removeFeature(f);
@@ -1255,7 +1270,7 @@
       distanceToolBtn.classList.remove('active');
       distanceTool.classList.remove('visible');
       distancePoints = [];
-      distanceValue.textContent = '0 ft (0 km)';
+      distanceValue.textContent = '0 mi (0 km)';
       map.getTargetElement().style.cursor = '';
       vectorSource.getFeatures().forEach(f => {
         if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
@@ -1308,16 +1323,14 @@
           totalPixels += Math.sqrt(dx * dx + dy * dy);
         }
         
-        const feet = Math.round(totalPixels / PIXELS_PER_FOOT);
-        const miles = feet / 5280;
-        const meters = feet * 0.3048;
-        const kilometers = meters / 1000;
+        const miles = totalPixels / PIXELS_PER_MILE;
+        const kilometers = miles * 1.60934;
         
         let displayText;
         if (miles >= 1) {
-          displayText = `${feet.toLocaleString()} ft (~${miles.toFixed(2)} mi / ${kilometers.toFixed(2)} km)`;
+          displayText = `${miles.toFixed(2)} mi (~${kilometers.toFixed(2)} km)`;
         } else {
-          displayText = `${feet.toLocaleString()} ft (~${kilometers.toFixed(3)} km)`;
+          displayText = `${(miles * 5280).toFixed(0)} ft (~${kilometers.toFixed(3)} km)`;
         }
         distanceValue.textContent = displayText;
       }
