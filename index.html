@@ -8,21 +8,69 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">
   <script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
   <style>
-    body, html { margin: 0; padding: 0; overflow: hidden; }
+    :root {
+      --primary-color: #4a90d9;
+      --danger-color: #e74c3c;
+      --bg-color: rgba(255, 255, 255, 0.95);
+      --text-color: #333;
+      --border-color: #444;
+    }
+
+    body, html { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
     #map { width: 100%; height: 100vh; background: transparent; }
 
-    /* popup */
+    /* ===== ИНДИКАЦИЯ ЗАГРУЗКИ ===== */
+    .loading-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+      color: white;
+      transition: opacity 0.3s ease;
+    }
+    .loading-overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .spinner {
+      width: 50px;
+      height: 50px;
+      border: 5px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    .loading-text {
+      font-size: 16px;
+      text-align: center;
+    }
+
+    /* ===== POPUP - АДАПТИВНЫЙ ДИЗАЙН ===== */
     .ol-popup {
       position: absolute;
-      background: white;
-      border: 2px solid #444;
+      background: var(--bg-color);
+      border: 2px solid var(--border-color);
       border-radius: 8px;
-      padding: 10px 14px;
+      padding: 12px 16px;
       font: 14px sans-serif;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       z-index: 1000;
       transform: translate(-50%, -100%);
-      white-space: nowrap;
+      max-width: 280px;
+      min-width: 150px;
+      white-space: normal;
+      word-wrap: break-word;
     }
     .ol-popup:after {
       content: "";
@@ -31,7 +79,7 @@
       left: 50%;
       transform: translateX(-50%);
       border: 12px solid transparent;
-      border-top-color: white;
+      border-top-color: var(--bg-color);
     }
     .ol-popup:before {
       content: "";
@@ -40,7 +88,7 @@
       left: 50%;
       transform: translateX(-50%);
       border: 14px solid transparent;
-      border-top-color: #444;
+      border-top-color: var(--border-color);
     }
     .ol-popup .close-btn {
       position: absolute;
@@ -48,12 +96,116 @@
       right: 6px;
       cursor: pointer;
       color: #666;
+      font-size: 18px;
+      line-height: 1;
+      background: none;
+      border: none;
+      padding: 4px;
+      border-radius: 4px;
+      transition: color 0.2s, background-color 0.2s;
     }
-    .ol-popup .close-btn:hover {
-      color: red;
+    .ol-popup .close-btn:hover,
+    .ol-popup .close-btn:focus {
+      color: var(--danger-color);
+      background-color: rgba(0, 0, 0, 0.1);
+      outline: none;
+    }
+    .ol-popup .popup-title {
+      font-weight: bold;
+      margin-bottom: 6px;
+      color: var(--text-color);
+      font-size: 15px;
+    }
+    .ol-popup .popup-desc {
+      color: #555;
+      font-size: 13px;
+      line-height: 1.4;
     }
 
-    /* координаты-хинт */
+    /* ===== ЛЕГЕНДА КАРТЫ ===== */
+    .legend {
+      position: absolute;
+      bottom: 60px;
+      right: 10px;
+      background: var(--bg-color);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      z-index: 1000;
+      max-width: 200px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .legend h3 {
+      margin: 0 0 10px 0;
+      font-size: 14px;
+      color: var(--text-color);
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 6px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 12px;
+      color: var(--text-color);
+    }
+    .legend-item:last-child {
+      margin-bottom: 0;
+    }
+    .legend-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 8px;
+      object-fit: contain;
+    }
+    .legend-color {
+      width: 16px;
+      height: 16px;
+      margin-right: 8px;
+      border-radius: 3px;
+      border: 1px solid #ccc;
+    }
+
+    /* ===== КНОПКИ УПРАВЛЕНИЯ ===== */
+    .map-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 1000;
+    }
+    .control-btn {
+      width: 40px;
+      height: 40px;
+      background: var(--bg-color);
+      border: 2px solid var(--border-color);
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-size: 20px;
+      color: var(--text-color);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      transition: background-color 0.2s, transform 0.1s;
+    }
+    .control-btn:hover {
+      background: #f0f0f0;
+    }
+    .control-btn:focus {
+      outline: 2px solid var(--primary-color);
+      outline-offset: 2px;
+    }
+    .control-btn:active {
+      transform: scale(0.95);
+    }
+    .control-btn[aria-label="Центрировать карту"] {
+      font-size: 16px;
+    }
+
+    /* ===== КООРДИНАТЫ ===== */
     #coords {
       position: absolute;
       bottom: 10px;
@@ -66,16 +218,113 @@
       font: 13px monospace;
       pointer-events: none;
     }
+
+    /* ===== СООБЩЕНИЕ ОБ ОШИБКЕ ===== */
+    .error-message {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ffebee;
+      border: 2px solid var(--danger-color);
+      border-radius: 8px;
+      padding: 12px 16px;
+      z-index: 1001;
+      color: var(--danger-color);
+      font-size: 14px;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+    .error-message.visible {
+      display: block;
+    }
+
+    /* ===== АДАПТИВНОСТЬ ===== */
+    @media (max-width: 480px) {
+      .ol-popup {
+        max-width: 220px;
+        padding: 10px 12px;
+      }
+      .legend {
+        bottom: 50px;
+        right: 5px;
+        padding: 8px;
+        max-width: 150px;
+      }
+      .map-controls {
+        top: 5px;
+        right: 5px;
+      }
+      .control-btn {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+      }
+    }
+
+    /* ===== СКРЫТИЕ ЭЛЕМЕНТОВ ДЛЯ СКРИНРИДЕРОВ ===== */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
   </style>
 </head>
 <body>
-  <div id="map"></div>
-  <div id="coords">Кликните по карте для получения координат</div>
+  <!-- ИНДИКАЦИЯ ЗАГРУЗКИ -->
+  <div id="loading" class="loading-overlay" role="status" aria-live="polite">
+    <div class="spinner" aria-hidden="true"></div>
+    <div class="loading-text">Загрузка карты...</div>
+  </div>
+
+  <!-- СООБЩЕНИЕ ОБ ОШИБКЕ -->
+  <div id="error" class="error-message" role="alert" aria-live="assertive"></div>
+
+  <div id="map" role="application" aria-label="Интерактивная карта местоположений"></div>
+
+  <!-- КНОПКИ УПРАВЛЕНИЯ -->
+  <div class="map-controls" role="group" aria-label="Управление картой">
+    <button class="control-btn" id="zoom-in" aria-label="Приблизить" title="Приблизить">+</button>
+    <button class="control-btn" id="zoom-out" aria-label="Отдалить" title="Отдалить">−</button>
+    <button class="control-btn" id="center-map" aria-label="Центрировать карту" title="Центрировать карту">⟲</button>
+  </div>
+
+  <!-- ЛЕГЕНДА КАРТЫ -->
+  <div class="legend" role="region" aria-label="Легенда карты">
+    <h3>Условные обозначения</h3>
+    <div class="legend-item">
+      <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="" class="legend-icon" aria-hidden="true">
+      <span>Местоположение</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-color" style="background: #4a90d9;" aria-hidden="true"></div>
+      <span>Выделенная точка</span>
+    </div>
+  </div>
+
+  <div id="coords" aria-live="polite">Кликните по карте для получения координат</div>
 
   <script>
+    // ===== КОНФИГУРАЦИЯ =====
+    const CONFIG = {
+      imageWidth: 4096,
+      imageHeight: 2304,
+      imageUrl: 'https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/main/The Mirelle constellation.png',
+      locationsUrl: 'https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/main/locations.json',
+      pinIconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+      pinScale: 0.05,
+      storageKey: 'noscape_map_state'
+    };
+
     // размеры изображения
-    const imageWidth = 4096;
-    const imageHeight = 2304;
+    const imageWidth = CONFIG.imageWidth;
+    const imageHeight = CONFIG.imageHeight;
     const extent = [0, 0, imageWidth, imageHeight];
 
     const projection = new ol.proj.Projection({
@@ -84,71 +333,220 @@
       extent: extent,
     });
 
-    const imageUrl = 'https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/main/The Mirelle constellation.png';
-
+    // ===== ИНИЦИАЛИЗАЦИЯ КАРТЫ =====
     const map = new ol.Map({
-  target: 'map',
-  layers: [
-    new ol.layer.Image({
-      source: new ol.source.ImageStatic({
-        url: imageUrl,
+      target: 'map',
+      layers: [
+        new ol.layer.Image({
+          source: new ol.source.ImageStatic({
+            url: CONFIG.imageUrl,
+            projection: projection,
+            imageExtent: extent
+          })
+        })
+      ],
+      view: new ol.View({
         projection: projection,
-        imageExtent: extent
-      })
-    })
-  ],
-  view: new ol.View({
-    projection: projection,
-    center: ol.extent.getCenter(extent),
-    zoom: 1.2,
-    minZoom: 0.5,   // 🔒 не слишком отдалять
-    maxZoom: 10,
-    extent: extent  // 🔒 ограничение перемещения карты
-  })
-});
-    const vectorSource = new ol.source.Vector();
-
-    const pinIcon = new ol.style.Icon({
-      src: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-      scale: 0.05,
-      anchor: [0.5, 1]
+        center: ol.extent.getCenter(extent),
+        zoom: 1.2,
+        minZoom: 0.5,
+        maxZoom: 10,
+        extent: extent
+      }),
+      controls: [] // отключаем стандартные контролы для кастомных
     });
 
-    // грузим точки из JSON
-    fetch("https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/main/locations.json")
-      .then(r => r.json())
+    // ===== ВЕКТОРНЫЙ СЛОЙ С МАРКЕРАМИ =====
+    const vectorSource = new ol.source.Vector();
+    
+    // Кэширование стиля иконки для оптимизации производительности
+    const pinIcon = new ol.style.Icon({
+      src: CONFIG.pinIconUrl,
+      scale: CONFIG.pinScale,
+      anchor: [0.5, 1]
+    });
+    
+    const markerStyle = new ol.style.Style({
+      image: pinIcon
+    });
+
+    // ===== ЛОКАЛЬНОЕ ХРАНЕНИЕ ДАННЫХ =====
+    function saveMapState() {
+      try {
+        const view = map.getView();
+        const state = {
+          zoom: view.getZoom(),
+          center: view.getCenter()
+        };
+        localStorage.setItem(CONFIG.storageKey, JSON.stringify(state));
+      } catch (e) {
+        console.warn('Не удалось сохранить состояние карты:', e);
+      }
+    }
+
+    function loadMapState() {
+      try {
+        const saved = localStorage.getItem(CONFIG.storageKey);
+        if (saved) {
+          const state = JSON.parse(saved);
+          if (state.zoom && state.center) {
+            map.getView().setZoom(state.zoom);
+            map.getView().setCenter(state.center);
+            return true;
+          }
+        }
+      } catch (e) {
+        console.warn('Не удалось загрузить состояние карты:', e);
+      }
+      return false;
+    }
+
+    // ===== ВАЛИДАЦИЯ ДАННЫХ =====
+    function validateLocation(loc) {
+      if (!loc || typeof loc !== 'object') {
+        console.warn('Неверный формат локации:', loc);
+        return false;
+      }
+      if (typeof loc.x !== 'number' || typeof loc.y !== 'number') {
+        console.warn('Координаты должны быть числами:', loc);
+        return false;
+      }
+      if (loc.x < 0 || loc.x > imageWidth || loc.y < 0 || loc.y > imageHeight) {
+        console.warn('Координаты вне диапазона карты:', loc);
+        return false;
+      }
+      if (typeof loc.name !== 'string' || loc.name.trim() === '') {
+        console.warn('Имя локации должно быть строкой:', loc);
+        return false;
+      }
+      return true;
+    }
+
+    // ===== ЗАГРУЗКА ДАННЫХ С ИНДИКАЦИЕЙ =====
+    const loadingEl = document.getElementById('loading');
+    const errorEl = document.getElementById('error');
+
+    function hideLoading() {
+      loadingEl.classList.add('hidden');
+      setTimeout(() => {
+        loadingEl.style.display = 'none';
+      }, 300);
+    }
+
+    function showError(message) {
+      errorEl.textContent = message;
+      errorEl.classList.add('visible');
+      setTimeout(() => {
+        errorEl.classList.remove('visible');
+      }, 5000);
+    }
+
+    // грузим точки из JSON с обработкой ошибок
+    fetch(CONFIG.locationsUrl)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(locations => {
+        let validCount = 0;
+        let invalidCount = 0;
+        
         locations.forEach(loc => {
-          const feature = new ol.Feature({
-            geometry: new ol.geom.Point([loc.x, loc.y]),
-            name: loc.name,
-            desc: loc.desc
-          });
+          if (validateLocation(loc)) {
+            const feature = new ol.Feature({
+              geometry: new ol.geom.Point([loc.x, loc.y]),
+              name: loc.name,
+              desc: loc.desc || ''
+            });
 
-          feature.setStyle(new ol.style.Style({
-            image: pinIcon
-          }));
-
-          vectorSource.addFeature(feature);
+            feature.setStyle(markerStyle);
+            vectorSource.addFeature(feature);
+            validCount++;
+          } else {
+            invalidCount++;
+          }
         });
+
+        console.log(`✅ Загружено локаций: ${validCount}, пропущено: ${invalidCount}`);
+        
+        // Сохраняем загруженные данные в localStorage для офлайн-доступа
+        try {
+          localStorage.setItem('noscape_locations', JSON.stringify(locations));
+          localStorage.setItem('noscape_locations_timestamp', Date.now().toString());
+        } catch (e) {
+          console.warn('Не удалось сохранить локации:', e);
+        }
+        
+        hideLoading();
+      })
+      .catch(err => {
+        console.error('Ошибка загрузки локаций:', err);
+        showError('⚠️ Не удалось загрузить данные локаций');
+        
+        // Пытаемся загрузить из localStorage
+        try {
+          const cached = localStorage.getItem('noscape_locations');
+          if (cached) {
+            const locations = JSON.parse(cached);
+            locations.forEach(loc => {
+              if (validateLocation(loc)) {
+                const feature = new ol.Feature({
+                  geometry: new ol.geom.Point([loc.x, loc.y]),
+                  name: loc.name,
+                  desc: loc.desc || ''
+                });
+                feature.setStyle(markerStyle);
+                vectorSource.addFeature(feature);
+              }
+            });
+            console.log('📦 Данные загружены из кэша');
+          }
+        } catch (e) {
+          console.warn('Кэш недоступен');
+        }
+        
+        hideLoading();
       });
 
-    map.addLayer(new ol.layer.Vector({ source: vectorSource }));
+    map.addLayer(new ol.layer.Vector({ 
+      source: vectorSource,
+      renderBuffer: 50 // оптимизация рендеринга
+    }));
 
-    // popup
+    // ===== POPUP С УЛУЧШЕННОЙ ДОСТУПНОСТЬЮ =====
     const popup = document.createElement('div');
     popup.className = 'ol-popup';
-    popup.innerHTML = `<span class="close-btn">✖</span><div id="popup-content"></div>`;
+    popup.setAttribute('role', 'dialog');
+    popup.setAttribute('aria-live', 'polite');
+    popup.innerHTML = `
+      <button class="close-btn" aria-label="Закрыть">✖</button>
+      <div class="popup-title" id="popup-title"></div>
+      <div class="popup-desc" id="popup-desc"></div>
+    `;
 
     const popupOverlay = new ol.Overlay({
       element: popup,
       positioning: 'bottom-center',
-      stopEvent: true
+      stopEvent: true,
+      offset: [0, -15]
     });
     map.addOverlay(popupOverlay);
 
-    popup.querySelector('.close-btn').addEventListener('click', () => {
+    const closeBtn = popup.querySelector('.close-btn');
+    const popupTitle = document.getElementById('popup-title');
+    const popupDesc = document.getElementById('popup-desc');
+
+    closeBtn.addEventListener('click', () => {
       popupOverlay.setPosition(undefined);
+      closeBtn.focus(); // возвращаем фокус на кнопку
+    });
+
+    // Закрытие по Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && popupOverlay.getPosition()) {
+        popupOverlay.setPosition(undefined);
+        closeBtn.focus();
+      }
     });
 
     map.on('click', (evt) => {
@@ -156,35 +554,84 @@
       if (feature && feature.get('name')) {
         const coord = feature.getGeometry().getCoordinates();
         popupOverlay.setPosition(coord);
-        document.getElementById('popup-content').innerHTML =
-          `<b>${feature.get('name')}</b><br>${feature.get('desc')}`;
+        popupTitle.textContent = feature.get('name');
+        popupDesc.textContent = feature.get('desc') || 'Нет описания';
+        
+        // Фокус на попап для скринридеров
+        popup.setAttribute('tabindex', '-1');
+        popup.focus();
       } else {
         popupOverlay.setPosition(undefined);
       }
     });
 
-    // ===== Вывод координат при клике =====
+    // ===== КНОПКИ УПРАВЛЕНИЯ =====
+    document.getElementById('zoom-in').addEventListener('click', () => {
+      const view = map.getView();
+      view.animate({ zoom: view.getZoom() + 1, duration: 250 });
+    });
+
+    document.getElementById('zoom-out').addEventListener('click', () => {
+      const view = map.getView();
+      view.animate({ zoom: view.getZoom() - 1, duration: 250 });
+    });
+
+    document.getElementById('center-map').addEventListener('click', () => {
+      map.getView().animate({
+        center: ol.extent.getCenter(extent),
+        zoom: 1.2,
+        duration: 500
+      });
+      localStorage.removeItem(CONFIG.storageKey); // сбрасываем сохранённое состояние
+    });
+
+    // ===== ВЫВОД КООРДИНАТ ПРИ КЛИКЕ =====
     const coordsDiv = document.getElementById('coords');
     map.on('singleclick', (evt) => {
       const coord = evt.coordinate;
       console.log("📌 Координаты для JSON:", { x: Math.round(coord[0]), y: Math.round(coord[1]) });
       coordsDiv.textContent = `x: ${Math.round(coord[0])}, y: ${Math.round(coord[1])}`;
     });
-    // ✅ авто-fit карты при загрузке
-map.getView().fit(extent, {
-  size: map.getSize(),
-  padding: [20, 20, 20, 20]
-});
 
-// ✅ авто-fit карты при ресайзе окна
-window.addEventListener('resize', () => {
-  map.updateSize();
-  map.getView().fit(extent, {
-    size: map.getSize(),
-    padding: [20, 20, 20, 20]
-  });
-  popupOverlay.setPosition(undefined); // закрываем попап при ресайзе
-});
+    // ===== СОХРАНЕНИЕ СОСТОЯНИЯ ПРИ ИЗМЕНЕНИИ КАРТЫ =====
+    let saveTimeout;
+    map.on('moveend', () => {
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(saveMapState, 500); // Debounce для оптимизации
+    });
+
+    // ===== АВТО-FIT КАРТЫ ПРИ ЗАГРУЗКЕ =====
+    // Сначала пробуем загрузить сохранённое состояние
+    if (!loadMapState()) {
+      map.getView().fit(extent, {
+        size: map.getSize(),
+        padding: [20, 20, 20, 20]
+      });
+    }
+
+    // ===== АВТО-FIT КАРТЫ ПРИ РЕСАЙЗЕ ОКНА =====
+    window.addEventListener('resize', () => {
+      map.updateSize();
+      map.getView().fit(extent, {
+        size: map.getSize(),
+        padding: [20, 20, 20, 20]
+      });
+      popupOverlay.setPosition(undefined);
+    });
+
+    // ===== ОПТИМИЗАЦИЯ ПРОИЗВОДИТЕЛЬНОСТИ =====
+    // Отключаем рендеринг при перетаскивании для больших наборов данных
+    map.on('movestart', () => {
+      map.getTargetElement().style.cursor = 'grabbing';
+    });
+    
+    map.on('moveend', () => {
+      map.getTargetElement().style.cursor = '';
+    });
+
+    // Предзагрузка иконки для ускорения отображения
+    const img = new Image();
+    img.src = CONFIG.pinIconUrl;
   </script>
 </body>
 </html>
