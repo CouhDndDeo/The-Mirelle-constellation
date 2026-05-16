@@ -84,7 +84,7 @@
       extent: extent,
     });
 
-    const imageUrl = 'https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/The Mirelle constellation.png';
+    const imageUrl = 'https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/main/The Mirelle constellation.png';
 
     const map = new ol.Map({
   target: 'map',
@@ -115,7 +115,7 @@
     });
 
     // грузим точки из JSON
-    fetch("https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/locations.json")
+    fetch("https://raw.githubusercontent.com/CouhDndDeo/The-Mirelle-constellation/main/locations.json")
       .then(r => r.json())
       .then(locations => {
         locations.forEach(loc => {
