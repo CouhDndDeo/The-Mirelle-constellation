@@ -378,11 +378,6 @@
       background: #f0e5c5;
     }
 
-    /* ===== ТУМАН ВОЙНЫ ===== */
-    .fog-of-war-layer {
-      pointer-events: none;
-    }
-
     /* ===== ГЕНЕРАТОР ВСТРЕЧ ===== */
     .encounter-panel {
       position: absolute;
@@ -589,7 +584,6 @@
     <button class="control-btn" id="zoom-out" aria-label="Отдалить" title="Отдалить">−</button>
     <button class="control-btn" id="center-map" aria-label="Центрировать карту" title="Центрировать карту">⟲</button>
     <button class="control-btn control-btn-small" id="distance-tool-btn" aria-label="Измерить расстояние" title="Измерить расстояние">📏</button>
-    <button class="control-btn control-btn-small" id="fog-of-war-btn" aria-label="Туман войны" title="Туман войны">🌫️</button>
     <button class="control-btn control-btn-small" id="encounter-btn" aria-label="Случайная встреча" title="Случайная встреча">🎲</button>
     <button class="control-btn control-btn-small" id="weather-btn" aria-label="Погода" title="Погода">⛈️</button>
     <button class="control-btn control-btn-small" id="add-marker-btn" aria-label="Добавить метку" title="Добавить свою метку">📍</button>
@@ -628,7 +622,21 @@
         <option value="camp">Лагерь</option>
         <option value="landmark">Ориентир</option>
         <option value="danger">Опасность</option>
+        <option value="city">Город</option>
+        <option value="dungeon">Подземелье</option>
+        <option value="tavern">Таверна</option>
+        <option value="shop">Магазин</option>
+        <option value="temple">Храм</option>
+        <option value="ruins">Руины</option>
+        <option value="cave">Пещера</option>
+        <option value="forest">Лес</option>
+        <option value="mountain">Горы</option>
+        <option value="water">Водоём</option>
       </select>
+    </div>
+    <div style="margin-bottom: 10px;">
+      <label style="display:block; margin-bottom:4px; font-size:13px;">Иконка:</label>
+      <div id="icon-picker" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px;"></div>
     </div>
     <div style="margin-bottom: 10px;">
       <label for="marker-color" style="display:block; margin-bottom:4px; font-size:13px;">Цвет:</label>
@@ -818,7 +826,7 @@
     }
     
     function addMarkerToMap(markerData, save = true) {
-      const { x, y, name, description, type, color } = markerData;
+      const { x, y, name, description, type, color, icon } = markerData;
       
       const feature = new ol.Feature({
         geometry: new ol.geom.Point([x, y]),
@@ -826,15 +834,33 @@
         name: name,
         description: description,
         color: color,
+        icon: icon || '📍',
         isUserMarker: true
       });
       
       const fillColor = color || '#e74c3c';
+      const markerIcon = icon || '📍';
+      
+      // Создаём canvas для отрисовки иконки
+      const canvas = document.createElement('canvas');
+      canvas.width = 40;
+      canvas.height = 40;
+      const ctx = canvas.getContext('2d');
+      
+      // Рисуем иконку emoji
+      ctx.font = '32px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(markerIcon, 20, 20);
+      
       feature.setStyle(new ol.style.Style({
-        image: new ol.style.Circle({
-          radius: 10,
-          fill: new ol.style.Fill({ color: fillColor }),
-          stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+        image: new ol.style.Icon({
+          img: canvas,
+          imgSize: [40, 40],
+          scale: 1,
+          anchor: [0.5, 0.5],
+          anchorXUnits: 'fraction',
+          anchorYUnits: 'fraction'
         })
       }));
       
@@ -890,6 +916,8 @@
       if (typeof data.x !== 'number' || typeof data.y !== 'number') return false;
       if (data.x < 0 || data.x > imageWidth || data.y < 0 || data.y > imageHeight) return false;
       if (typeof data.name !== 'string' || data.name.trim() === '') return false;
+      // icon может быть undefined для старых меток
+      if (data.icon !== undefined && typeof data.icon !== 'string') return false;
       return true;
     }
 
@@ -1257,107 +1285,6 @@
       }
     });
 
-    // ===== ТУМАН ВОЙНЫ (D&D) - ОПТИМИЗИРОВАННЫЙ =====
-    const fogOfWarBtn = document.getElementById('fog-of-war-btn');
-    let fogOfWarActive = false;
-    let fogOverlay = null;
-    let fogAnimationFrame = null;
-    let lastFogUpdate = 0;
-    const FOG_UPDATE_INTERVAL = 100; // мс между обновлениями
-    
-    fogOfWarBtn.addEventListener('click', () => {
-      fogOfWarActive = !fogOfWarActive;
-      fogOfWarBtn.classList.toggle('active', fogOfWarActive);
-      
-      if (fogOfWarActive) {
-        // Создаём canvas для тумана войны
-        const fogCanvas = document.createElement('canvas');
-        fogCanvas.className = 'fog-of-war-layer';
-        const ctx = fogCanvas.getContext('2d');
-        
-        fogOverlay = new ol.Overlay({
-          position: ol.extent.getCenter(extent),
-          positioning: 'center-center',
-          element: fogCanvas,
-          stopEvent: false
-        });
-        map.addOverlay(fogOverlay);
-        
-        const updateFog = (timestamp) => {
-          // Ограничиваем частоту обновлений
-          if (timestamp - lastFogUpdate < FOG_UPDATE_INTERVAL) {
-            fogAnimationFrame = requestAnimationFrame(updateFog);
-            return;
-          }
-          lastFogUpdate = timestamp;
-          
-          const size = map.getSize();
-          const view = map.getView();
-          const resolution = view.getResolution();
-          
-          // Адаптивный размер видимости в зависимости от зума
-          const baseRadius = 150;
-          const visibilityRadius = Math.max(baseRadius * (1 / resolution), 50);
-          
-          fogCanvas.width = size[0];
-          fogCanvas.height = size[1];
-          
-          // Заполняем чёрным с прозрачностью
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-          ctx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
-          
-          // Вырезаем круги видимости для каждого персонажа
-          ctx.globalCompositeOperation = 'destination-out';
-          
-          // Получаем все маркеры персонажей
-          const characterFeatures = vectorSource.getFeatures().filter(f => f.get('type') === 'character');
-          
-          if (characterFeatures.length === 0) {
-            // Если нет персонажей, показываем центр карты
-            const centerCoord = view.getCenter();
-            const centerPixel = map.getPixelFromCoordinate(centerCoord);
-            if (centerPixel) {
-              const gradient = ctx.createRadialGradient(centerPixel[0], centerPixel[1], 0, centerPixel[0], centerPixel[1], visibilityRadius);
-              gradient.addColorStop(0, 'rgba(0,0,0,1)');
-              gradient.addColorStop(1, 'rgba(0,0,0,0)');
-              ctx.fillStyle = gradient;
-              ctx.beginPath();
-              ctx.arc(centerPixel[0], centerPixel[1], visibilityRadius, 0, Math.PI * 2);
-              ctx.fill();
-            }
-          } else {
-            characterFeatures.forEach(f => {
-              const coord = f.getGeometry().getCoordinates();
-              const pixel = map.getPixelFromCoordinate(coord);
-              if (pixel) {
-                const gradient = ctx.createRadialGradient(pixel[0], pixel[1], 0, pixel[0], pixel[1], visibilityRadius);
-                gradient.addColorStop(0, 'rgba(0,0,0,1)');
-                gradient.addColorStop(1, 'rgba(0,0,0,0)');
-                ctx.fillStyle = gradient;
-                ctx.beginPath();
-                ctx.arc(pixel[0], pixel[1], visibilityRadius, 0, Math.PI * 2);
-                ctx.fill();
-              }
-            });
-          }
-          
-          ctx.globalCompositeOperation = 'source-over';
-          fogAnimationFrame = requestAnimationFrame(updateFog);
-        };
-        
-        fogAnimationFrame = requestAnimationFrame(updateFog);
-      } else {
-        if (fogAnimationFrame) {
-          cancelAnimationFrame(fogAnimationFrame);
-          fogAnimationFrame = null;
-        }
-        if (fogOverlay) {
-          map.removeOverlay(fogOverlay);
-          fogOverlay = null;
-        }
-      }
-    });
-
     // ===== ГЕНЕРАТОР СЛУЧАЙНЫХ ВСТРЕЧ (D&D) =====
     const encounterBtn = document.getElementById('encounter-btn');
     const encounterPanel = document.getElementById('encounter-panel');
@@ -1447,10 +1374,66 @@
     const markerSaveBtn = document.getElementById('marker-save');
     const markerCancelBtn = document.getElementById('marker-cancel');
     const markerShareBtn = document.getElementById('marker-share');
+    const iconPickerDiv = document.getElementById('icon-picker');
+    
+    // Иконки для маркеров D&D
+    const markerIcons = {
+      'user': '📍',
+      'character': '🧙',
+      'camp': '⛺',
+      'landmark': '🗿',
+      'danger': '💀',
+      'city': '🏰',
+      'dungeon': '🚪',
+      'tavern': '🍺',
+      'shop': '🛒',
+      'temple': '⛪',
+      'ruins': '🏛️',
+      'cave': '🕳️',
+      'forest': '🌲',
+      'mountain': '⛰️',
+      'water': '💧'
+    };
+    
+    let selectedIcon = '📍';
+    
+    // Создаём пикер иконок
+    function createIconPicker() {
+      iconPickerDiv.innerHTML = '';
+      Object.entries(markerIcons).forEach(([type, icon]) => {
+        const btn = document.createElement('button');
+        btn.textContent = icon;
+        btn.className = 'encounter-btn';
+        btn.style.padding = '6px 10px';
+        btn.style.fontSize = '18px';
+        btn.style.flex = '0 0 auto';
+        if (selectedIcon === icon) {
+          btn.style.background = '#e8dcc0';
+          btn.style.boxShadow = 'inset 0 2px 4px rgba(0,0,0,0.2)';
+        }
+        btn.addEventListener('click', () => {
+          selectedIcon = icon;
+          createIconPicker();
+        });
+        btn.setAttribute('aria-label', `Выбрать иконку ${icon}`);
+        btn.setAttribute('title', type);
+        iconPickerDiv.appendChild(btn);
+      });
+    }
+    
+    // Обновляем иконку при смене типа
+    markerTypeSelect.addEventListener('change', () => {
+      const type = markerTypeSelect.value;
+      if (markerIcons[type]) {
+        selectedIcon = markerIcons[type];
+        createIconPicker();
+      }
+    });
     
     let pendingMarkerCoord = null;
     
     addMarkerBtn.addEventListener('click', () => {
+      createIconPicker();
       addMarkerPanel.classList.toggle('visible');
       if (addMarkerPanel.classList.contains('visible')) {
         coordsDiv.textContent = 'Кликните по карте для выбора места метки';
@@ -1487,7 +1470,8 @@
         name: name,
         description: markerDescInput.value.trim(),
         type: markerTypeSelect.value,
-        color: markerColorInput.value
+        color: markerColorInput.value,
+        icon: selectedIcon
       };
       
       addMarkerToMap(markerData, true);
@@ -1497,6 +1481,7 @@
       markerDescInput.value = '';
       markerColorInput.value = '#e74c3c';
       markerTypeSelect.value = 'user';
+      selectedIcon = '📍';
       addMarkerPanel.classList.remove('visible');
       map.getTargetElement().style.cursor = '';
       pendingMarkerCoord = null;
@@ -1523,7 +1508,8 @@
         name: name,
         description: markerDescInput.value.trim(),
         type: markerTypeSelect.value,
-        color: markerColorInput.value
+        color: markerColorInput.value,
+        icon: selectedIcon
       };
       
       const shareData = JSON.stringify({
