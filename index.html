@@ -194,7 +194,7 @@
     .legend {
       position: absolute;
       bottom: 60px;
-      right: 10px;
+      left: 10px;
       background: var(--parchment-bg);
       border: 3px double var(--parchment-border);
       border-radius: 8px;
@@ -468,6 +468,11 @@
         left: 10px;
         max-width: none;
         max-height: calc(100vh - 40px);
+      }
+      .legend {
+        bottom: 10px;
+        max-width: 180px;
+        font-size: 12px;
       }
     }
 
@@ -1327,10 +1332,10 @@
         const kilometers = miles * 1.60934;
         
         let displayText;
-        if (miles >= 1) {
-          displayText = `${miles.toFixed(2)} mi (~${kilometers.toFixed(2)} km)`;
+        if (kilometers >= 1) {
+          displayText = `${kilometers.toFixed(2)} км (~${miles.toFixed(2)} mi)`;
         } else {
-          displayText = `${(miles * 5280).toFixed(0)} ft (~${kilometers.toFixed(3)} km)`;
+          displayText = `${(kilometers * 1000).toFixed(0)} м (~${(miles * 5280).toFixed(0)} ft)`;
         }
         distanceValue.textContent = displayText;
       }
