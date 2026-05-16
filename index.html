@@ -3,21 +3,76 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Карта Носкапа</title>
+  <title>Карта Носкапа - D&D</title>
   <link rel="icon" href="data:,"><!-- пустой favicon -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@10.6.1/ol.css">
   <script src="https://cdn.jsdelivr.net/npm/ol@10.6.1/dist/ol.js"></script>
+  <!-- Подключаем шрифт для фэнтези стиля -->
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary-color: #4a90d9;
       --danger-color: #e74c3c;
-      --bg-color: rgba(255, 255, 255, 0.95);
-      --text-color: #333;
-      --border-color: #444;
+      --warning-color: #f39c12;
+      --success-color: #27ae60;
+      --bg-color: rgba(245, 235, 215, 0.95);
+      --text-color: #2c1810;
+      --border-color: #8b4513;
+      --parchment-bg: #f5ebd5;
+      --parchment-border: #8b4513;
     }
 
-    body, html { margin: 0; padding: 0; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    #map { width: 100%; height: 100vh; background: transparent; }
+    body, html { margin: 0; padding: 0; overflow: hidden; font-family: 'IM Fell English', serif; }
+    
+    /* ===== СТИЛИЗАЦИЯ ПОД ПЕРГАМЕНТ ===== */
+    #map { 
+      width: 100%; 
+      height: 100vh; 
+      background: transparent;
+      filter: sepia(0.3) contrast(1.1) brightness(0.95);
+    }
+    
+    /* Оверлей погоды */
+    .weather-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      pointer-events: none;
+      z-index: 500;
+      opacity: 0;
+      transition: opacity 2s ease;
+    }
+    .weather-overlay.rain {
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 50px,
+        rgba(100, 150, 200, 0.1) 50px,
+        rgba(100, 150, 200, 0.1) 51px
+      );
+      opacity: 0.3;
+    }
+    .weather-overlay.fog {
+      background: radial-gradient(ellipse at center, rgba(200, 200, 200, 0) 0%, rgba(200, 200, 200, 0.4) 100%);
+      opacity: 0.5;
+    }
+    .weather-overlay.storm {
+      background: repeating-linear-gradient(
+        90deg,
+        transparent,
+        transparent 50px,
+        rgba(100, 150, 200, 0.15) 50px,
+        rgba(100, 150, 200, 0.15) 51px
+      );
+      opacity: 0.4;
+      animation: flash 3s infinite;
+    }
+    @keyframes flash {
+      0%, 90%, 100% { opacity: 0.4; }
+      95% { opacity: 0.7; }
+    }
 
     /* ===== ИНДИКАЦИЯ ЗАГРУЗКИ ===== */
     .loading-overlay {
@@ -26,14 +81,15 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.7);
+      background: rgba(44, 24, 16, 0.85);
       display: flex;
       flex-direction: column;
       justify-content: center;
       align-items: center;
       z-index: 9999;
-      color: white;
+      color: #f5ebd5;
       transition: opacity 0.3s ease;
+      font-family: 'Cinzel', serif;
     }
     .loading-overlay.hidden {
       opacity: 0;
@@ -42,8 +98,8 @@
     .spinner {
       width: 50px;
       height: 50px;
-      border: 5px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
+      border: 5px solid rgba(245, 235, 215, 0.3);
+      border-top-color: #f5ebd5;
       border-radius: 50%;
       animation: spin 1s linear infinite;
       margin-bottom: 15px;
@@ -52,74 +108,86 @@
       to { transform: rotate(360deg); }
     }
     .loading-text {
-      font-size: 16px;
+      font-size: 18px;
       text-align: center;
+      font-family: 'Cinzel', serif;
     }
 
     /* ===== POPUP - АДАПТИВНЫЙ ДИЗАЙН ===== */
     .ol-popup {
       position: absolute;
-      background: var(--bg-color);
-      border: 2px solid var(--border-color);
+      background: var(--parchment-bg);
+      border: 3px double var(--parchment-border);
       border-radius: 8px;
-      padding: 12px 16px;
-      font: 14px sans-serif;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      padding: 14px 18px;
+      font: 15px 'IM Fell English', serif;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       z-index: 1000;
       transform: translate(-50%, -100%);
-      max-width: 280px;
-      min-width: 150px;
+      max-width: 320px;
+      min-width: 180px;
       white-space: normal;
       word-wrap: break-word;
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
     }
     .ol-popup:after {
-      content: "";
-      position: absolute;
-      bottom: -12px;
-      left: 50%;
-      transform: translateX(-50%);
-      border: 12px solid transparent;
-      border-top-color: var(--bg-color);
-    }
-    .ol-popup:before {
       content: "";
       position: absolute;
       bottom: -14px;
       left: 50%;
       transform: translateX(-50%);
       border: 14px solid transparent;
-      border-top-color: var(--border-color);
+      border-top-color: var(--parchment-bg);
+    }
+    .ol-popup:before {
+      content: "";
+      position: absolute;
+      bottom: -17px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 16px solid transparent;
+      border-top-color: var(--parchment-border);
     }
     .ol-popup .close-btn {
       position: absolute;
       top: 4px;
       right: 6px;
       cursor: pointer;
-      color: #666;
-      font-size: 18px;
+      color: var(--parchment-border);
+      font-size: 20px;
       line-height: 1;
       background: none;
       border: none;
       padding: 4px;
       border-radius: 4px;
       transition: color 0.2s, background-color 0.2s;
+      font-family: 'Cinzel', serif;
     }
     .ol-popup .close-btn:hover,
     .ol-popup .close-btn:focus {
       color: var(--danger-color);
-      background-color: rgba(0, 0, 0, 0.1);
+      background-color: rgba(139, 69, 19, 0.1);
       outline: none;
     }
     .ol-popup .popup-title {
       font-weight: bold;
-      margin-bottom: 6px;
+      margin-bottom: 8px;
       color: var(--text-color);
-      font-size: 15px;
+      font-size: 17px;
+      font-family: 'Cinzel', serif;
+      border-bottom: 1px solid var(--parchment-border);
+      padding-bottom: 6px;
     }
     .ol-popup .popup-desc {
-      color: #555;
-      font-size: 13px;
-      line-height: 1.4;
+      color: #4a3728;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+    .ol-popup .popup-meta {
+      margin-top: 8px;
+      font-size: 12px;
+      color: #6b5344;
+      font-style: italic;
     }
 
     /* ===== ЛЕГЕНДА КАРТЫ ===== */
@@ -127,43 +195,57 @@
       position: absolute;
       bottom: 60px;
       right: 10px;
-      background: var(--bg-color);
-      border: 2px solid var(--border-color);
+      background: var(--parchment-bg);
+      border: 3px double var(--parchment-border);
       border-radius: 8px;
-      padding: 12px;
+      padding: 14px;
       z-index: 1000;
-      max-width: 200px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      max-width: 220px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: 'IM Fell English', serif;
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
     }
     .legend h3 {
-      margin: 0 0 10px 0;
-      font-size: 14px;
+      margin: 0 0 12px 0;
+      font-size: 16px;
       color: var(--text-color);
-      border-bottom: 1px solid #ddd;
-      padding-bottom: 6px;
+      border-bottom: 2px solid var(--parchment-border);
+      padding-bottom: 8px;
+      font-family: 'Cinzel', serif;
     }
     .legend-item {
       display: flex;
       align-items: center;
-      margin-bottom: 8px;
-      font-size: 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
       color: var(--text-color);
     }
     .legend-item:last-child {
       margin-bottom: 0;
     }
     .legend-icon {
-      width: 20px;
-      height: 20px;
-      margin-right: 8px;
+      width: 24px;
+      height: 24px;
+      margin-right: 10px;
       object-fit: contain;
     }
     .legend-color {
-      width: 16px;
-      height: 16px;
-      margin-right: 8px;
+      width: 18px;
+      height: 18px;
+      margin-right: 10px;
       border-radius: 3px;
-      border: 1px solid #ccc;
+      border: 2px solid var(--parchment-border);
+    }
+    .legend-section {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--parchment-border);
+    }
+    .legend-section h4 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: var(--text-color);
+      font-family: 'Cinzel', serif;
     }
 
     /* ===== КНОПКИ УПРАВЛЕНИЯ ===== */
@@ -177,31 +259,44 @@
       z-index: 1000;
     }
     .control-btn {
-      width: 40px;
-      height: 40px;
-      background: var(--bg-color);
-      border: 2px solid var(--border-color);
+      width: 44px;
+      height: 44px;
+      background: var(--parchment-bg);
+      border: 3px double var(--parchment-border);
       border-radius: 8px;
       cursor: pointer;
       display: flex;
       justify-content: center;
       align-items: center;
-      font-size: 20px;
+      font-size: 22px;
       color: var(--text-color);
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
       transition: background-color 0.2s, transform 0.1s;
+      font-family: 'Cinzel', serif;
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
     }
     .control-btn:hover {
-      background: #f0f0f0;
+      background: #f0e5c5;
     }
     .control-btn:focus {
-      outline: 2px solid var(--primary-color);
+      outline: 3px solid var(--primary-color);
       outline-offset: 2px;
     }
     .control-btn:active {
       transform: scale(0.95);
     }
+    .control-btn.active {
+      background: #e8dcc0;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
     .control-btn[aria-label="Центрировать карту"] {
+      font-size: 18px;
+    }
+    
+    /* Дополнительные кнопки D&D */
+    .control-btn-small {
+      width: 36px;
+      height: 36px;
       font-size: 16px;
     }
 
@@ -211,12 +306,13 @@
       bottom: 10px;
       left: 50%;
       transform: translateX(-50%);
-      background: rgba(0,0,0,0.7);
-      color: #fff;
-      padding: 6px 10px;
+      background: rgba(44, 24, 16, 0.85);
+      color: #f5ebd5;
+      padding: 8px 14px;
       border-radius: 6px;
-      font: 13px monospace;
+      font: 14px 'IM Fell English', serif;
       pointer-events: none;
+      border: 2px solid var(--parchment-border);
     }
 
     /* ===== СООБЩЕНИЕ ОБ ОШИБКЕ ===== */
@@ -226,39 +322,238 @@
       left: 50%;
       transform: translateX(-50%);
       background: #ffebee;
-      border: 2px solid var(--danger-color);
+      border: 3px double var(--danger-color);
       border-radius: 8px;
-      padding: 12px 16px;
+      padding: 14px 18px;
       z-index: 1001;
       color: var(--danger-color);
-      font-size: 14px;
+      font-size: 15px;
       display: none;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: 'IM Fell English', serif;
     }
     .error-message.visible {
       display: block;
     }
 
+    /* ===== ИЗМЕРИТЕЛЬ РАССТОЯНИЙ ===== */
+    .distance-tool {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--parchment-bg);
+      border: 3px double var(--parchment-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      z-index: 1000;
+      font-family: 'IM Fell English', serif;
+      display: none;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+    }
+    .distance-tool.visible {
+      display: block;
+    }
+    .distance-info {
+      font-size: 14px;
+      color: var(--text-color);
+      margin-bottom: 6px;
+    }
+    .distance-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .distance-btn {
+      padding: 4px 10px;
+      background: var(--parchment-bg);
+      border: 2px solid var(--parchment-border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'IM Fell English', serif;
+      font-size: 12px;
+      transition: background-color 0.2s;
+    }
+    .distance-btn:hover {
+      background: #f0e5c5;
+    }
+
+    /* ===== ТУМАН ВОЙНЫ ===== */
+    .fog-of-war-layer {
+      pointer-events: none;
+    }
+
+    /* ===== ГЕНЕРАТОР ВСТРЕЧ ===== */
+    .encounter-panel {
+      position: absolute;
+      top: 60px;
+      right: 10px;
+      background: var(--parchment-bg);
+      border: 3px double var(--parchment-border);
+      border-radius: 8px;
+      padding: 14px;
+      z-index: 1000;
+      max-width: 280px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      font-family: 'IM Fell English', serif;
+      display: none;
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+    }
+    .encounter-panel.visible {
+      display: block;
+    }
+    .encounter-panel h3 {
+      margin: 0 0 10px 0;
+      font-size: 16px;
+      color: var(--text-color);
+      font-family: 'Cinzel', serif;
+      border-bottom: 2px solid var(--parchment-border);
+      padding-bottom: 8px;
+    }
+    .encounter-result {
+      font-size: 14px;
+      color: var(--text-color);
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .encounter-terrain {
+      font-size: 12px;
+      color: #6b5344;
+      font-style: italic;
+      margin-bottom: 8px;
+    }
+    .encounter-btn {
+      width: 100%;
+      padding: 8px;
+      background: var(--parchment-bg);
+      border: 2px solid var(--parchment-border);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: 'Cinzel', serif;
+      font-size: 13px;
+      transition: background-color 0.2s;
+    }
+    .encounter-btn:hover {
+      background: #f0e5c5;
+    }
+
+    /* ===== МИНИ-КАРТА ПОДЗЕМЕЛЬЯ ===== */
+    .dungeon-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(44, 24, 16, 0.9);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 2000;
+      font-family: 'IM Fell English', serif;
+    }
+    .dungeon-modal.visible {
+      display: flex;
+    }
+    .dungeon-content {
+      background: var(--parchment-bg);
+      border: 4px double var(--parchment-border);
+      border-radius: 12px;
+      padding: 20px;
+      max-width: 800px;
+      max-height: 90vh;
+      overflow: auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+    }
+    .dungeon-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      border-bottom: 2px solid var(--parchment-border);
+      padding-bottom: 12px;
+    }
+    .dungeon-header h2 {
+      margin: 0;
+      font-size: 22px;
+      color: var(--text-color);
+      font-family: 'Cinzel', serif;
+    }
+    .dungeon-close {
+      background: none;
+      border: none;
+      font-size: 28px;
+      cursor: pointer;
+      color: var(--parchment-border);
+      font-family: 'Cinzel', serif;
+      transition: color 0.2s;
+    }
+    .dungeon-close:hover {
+      color: var(--danger-color);
+    }
+    .dungeon-map-container {
+      width: 100%;
+      height: 400px;
+      border: 2px solid var(--parchment-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+    .dungeon-info {
+      margin-top: 16px;
+      font-size: 14px;
+      color: var(--text-color);
+      line-height: 1.6;
+    }
+
+    /* ===== ПАНЕЛЬ УРОВНЯ ОПАСНОСТИ ===== */
+    .danger-indicator {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+      color: white;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .danger-low { background: var(--success-color); }
+    .danger-medium { background: var(--warning-color); }
+    .danger-high { background: var(--danger-color); }
+    .danger-extreme { background: #8e44ad; }
+
     /* ===== АДАПТИВНОСТЬ ===== */
     @media (max-width: 480px) {
       .ol-popup {
-        max-width: 220px;
-        padding: 10px 12px;
+        max-width: 260px;
+        padding: 12px 14px;
       }
       .legend {
         bottom: 50px;
         right: 5px;
-        padding: 8px;
-        max-width: 150px;
+        padding: 10px;
+        max-width: 180px;
       }
       .map-controls {
         top: 5px;
         right: 5px;
       }
       .control-btn {
-        width: 36px;
-        height: 36px;
+        width: 40px;
+        height: 40px;
         font-size: 18px;
+      }
+      .distance-tool {
+        top: 55px;
+        left: 50%;
+        transform: translateX(-50%);
+        max-width: 280px;
+      }
+      .encounter-panel {
+        top: auto;
+        bottom: 60px;
+        right: 5px;
+        left: 5px;
+        max-width: none;
       }
     }
 
@@ -293,6 +588,30 @@
     <button class="control-btn" id="zoom-in" aria-label="Приблизить" title="Приблизить">+</button>
     <button class="control-btn" id="zoom-out" aria-label="Отдалить" title="Отдалить">−</button>
     <button class="control-btn" id="center-map" aria-label="Центрировать карту" title="Центрировать карту">⟲</button>
+    <button class="control-btn control-btn-small" id="distance-tool-btn" aria-label="Измерить расстояние" title="Измерить расстояние">📏</button>
+    <button class="control-btn control-btn-small" id="fog-of-war-btn" aria-label="Туман войны" title="Туман войны">🌫️</button>
+    <button class="control-btn control-btn-small" id="encounter-btn" aria-label="Случайная встреча" title="Случайная встреча">🎲</button>
+    <button class="control-btn control-btn-small" id="weather-btn" aria-label="Погода" title="Погода">⛈️</button>
+  </div>
+
+  <!-- ИЗМЕРИТЕЛЬ РАССТОЯНИЙ -->
+  <div id="distance-tool" class="distance-tool" role="dialog" aria-label="Измеритель расстояний">
+    <div class="distance-info">
+      <span id="distance-value">0 ft (0 м)</span>
+    </div>
+    <div class="distance-buttons">
+      <button class="distance-btn" id="distance-clear">Очистить</button>
+      <button class="distance-btn" id="distance-close">Закрыть</button>
+    </div>
+  </div>
+
+  <!-- ГЕНЕРАТОР ВСТРЕЧ -->
+  <div id="encounter-panel" class="encounter-panel" role="dialog" aria-label="Генератор встреч">
+    <h3>🎲 Случайная встреча</h3>
+    <div id="encounter-terrain" class="encounter-terrain">Местность: Не определена</div>
+    <div id="encounter-result" class="encounter-result">Нажмите кнопку для генерации</div>
+    <button class="encounter-btn" id="encounter-generate">Сгенерировать встречу</button>
+    <button class="encounter-btn" id="encounter-close" style="margin-top: 8px;">Закрыть</button>
   </div>
 
   <!-- ЛЕГЕНДА КАРТЫ -->
@@ -302,9 +621,55 @@
       <img src="https://cdn-icons-png.flaticon.com/512/684/684908.png" alt="" class="legend-icon" aria-hidden="true">
       <span>Местоположение</span>
     </div>
-    <div class="legend-item">
-      <div class="legend-color" style="background: #4a90d9;" aria-hidden="true"></div>
-      <span>Выделенная точка</span>
+    <div class="legend-section">
+      <h4>Уровни опасности</h4>
+      <div class="legend-item">
+        <div class="legend-color danger-low" aria-hidden="true"></div>
+        <span>Низкий (CR 0-2)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color danger-medium" aria-hidden="true"></div>
+        <span>Средний (CR 3-6)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color danger-high" aria-hidden="true"></div>
+        <span>Высокий (CR 7-10)</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color danger-extreme" aria-hidden="true"></div>
+        <span>Экстремальный (CR 11+)</span>
+      </div>
+    </div>
+    <div class="legend-section">
+      <h4>Типы локаций</h4>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #3498db;" aria-hidden="true"></div>
+        <span>Город/Поселение</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #9b59b6;" aria-hidden="true"></div>
+        <span>Подземелье</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #f39c12;" aria-hidden="true"></div>
+        <span>Таверна/Постоялый двор</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-color" style="background: #27ae60;" aria-hidden="true"></div>
+        <span>Лес/Природа</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ПОДЗЕМЕЛЬЯ -->
+  <div id="dungeon-modal" class="dungeon-modal" role="dialog" aria-label="Карта подземелья">
+    <div class="dungeon-content">
+      <div class="dungeon-header">
+        <h2 id="dungeon-title">Подземелье</h2>
+        <button class="dungeon-close" id="dungeon-close" aria-label="Закрыть">×</button>
+      </div>
+      <div id="dungeon-map-container" class="dungeon-map-container"></div>
+      <div id="dungeon-info" class="dungeon-info"></div>
     </div>
   </div>
 
@@ -582,8 +947,258 @@
         zoom: 1.2,
         duration: 500
       });
-      localStorage.removeItem(CONFIG.storageKey); // сбрасываем сохранённое состояние
+      localStorage.removeItem(CONFIG.storageKey);
     });
+
+    // ===== ИЗМЕРИТЕЛЬ РАССТОЯНИЙ (D&D) =====
+    const distanceToolBtn = document.getElementById('distance-tool-btn');
+    const distanceTool = document.getElementById('distance-tool');
+    const distanceValue = document.getElementById('distance-value');
+    const distanceClearBtn = document.getElementById('distance-clear');
+    const distanceCloseBtn = document.getElementById('distance-close');
+    
+    let distanceMode = false;
+    let distancePoints = [];
+    const PIXELS_PER_FOOT = 10; // 10 пикселей = 1 фут (настройте под масштаб карты)
+    
+    distanceToolBtn.addEventListener('click', () => {
+      distanceMode = !distanceMode;
+      distanceToolBtn.classList.toggle('active', distanceMode);
+      distanceTool.classList.toggle('visible', distanceMode);
+      if (distanceMode) {
+        distancePoints = [];
+        distanceValue.textContent = 'Кликните на карту для установки точек';
+        map.getTargetElement().style.cursor = 'crosshair';
+      } else {
+        distancePoints = [];
+        distanceValue.textContent = '0 ft (0 м)';
+        map.getTargetElement().style.cursor = '';
+        // Очищаем маркеры расстояния
+        vectorSource.getFeatures().forEach(f => {
+          if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
+            vectorSource.removeFeature(f);
+          }
+        });
+      }
+    });
+    
+    distanceClearBtn.addEventListener('click', () => {
+      distancePoints = [];
+      distanceValue.textContent = '0 ft (0 м)';
+      vectorSource.getFeatures().forEach(f => {
+        if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
+          vectorSource.removeFeature(f);
+        }
+      });
+    });
+    
+    distanceCloseBtn.addEventListener('click', () => {
+      distanceMode = false;
+      distanceToolBtn.classList.remove('active');
+      distanceTool.classList.remove('visible');
+      distancePoints = [];
+      distanceValue.textContent = '0 ft (0 м)';
+      map.getTargetElement().style.cursor = '';
+      vectorSource.getFeatures().forEach(f => {
+        if (f.get('type') === 'distance-point' || f.get('type') === 'distance-line') {
+          vectorSource.removeFeature(f);
+        }
+      });
+    });
+    
+    map.on('singleclick', (evt) => {
+      if (!distanceMode) return;
+      
+      const coord = evt.coordinate;
+      distancePoints.push(coord);
+      
+      // Добавляем маркер точки
+      const pointFeature = new ol.Feature({
+        geometry: new ol.geom.Point(coord),
+        type: 'distance-point'
+      });
+      pointFeature.setStyle(new ol.style.Style({
+        image: new ol.style.Circle({
+          radius: 6,
+          fill: new ol.style.Fill({ color: '#e74c3c' }),
+          stroke: new ol.style.Stroke({ color: '#fff', width: 2 })
+        })
+      }));
+      vectorSource.addFeature(pointFeature);
+      
+      // Если есть 2+ точки, рисуем линию и считаем расстояние
+      if (distancePoints.length >= 2) {
+        const lineCoords = [...distancePoints];
+        const lineFeature = new ol.Feature({
+          geometry: new ol.geom.LineString(lineCoords),
+          type: 'distance-line'
+        });
+        lineFeature.setStyle(new ol.style.Style({
+          stroke: new ol.style.Stroke({
+            color: '#e74c3c',
+            width: 3,
+            lineDash: [10, 5]
+          })
+        }));
+        vectorSource.addFeature(lineFeature);
+        
+        // Считаем общее расстояние
+        let totalPixels = 0;
+        for (let i = 1; i < distancePoints.length; i++) {
+          const dx = distancePoints[i][0] - distancePoints[i-1][0];
+          const dy = distancePoints[i][1] - distancePoints[i-1][1];
+          totalPixels += Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        const feet = Math.round(totalPixels / PIXELS_PER_FOOT);
+        const meters = Math.round(feet * 0.3048);
+        distanceValue.textContent = `${feet} ft (~${meters} м)`;
+      }
+    });
+
+    // ===== ТУМАН ВОЙНЫ (D&D) =====
+    const fogOfWarBtn = document.getElementById('fog-of-war-btn');
+    let fogOfWarActive = false;
+    let fogOverlay = null;
+    
+    fogOfWarBtn.addEventListener('click', () => {
+      fogOfWarActive = !fogOfWarActive;
+      fogOfWarBtn.classList.toggle('active', fogOfWarActive);
+      
+      if (fogOfWarActive) {
+        // Создаём canvas для тумана войны
+        const fogCanvas = document.createElement('canvas');
+        fogCanvas.className = 'fog-of-war-layer';
+        const ctx = fogCanvas.getContext('2d');
+        
+        fogOverlay = new ol.Overlay({
+          position: ol.extent.getCenter(extent),
+          positioning: 'center-center',
+          element: fogCanvas,
+          stopEvent: false
+        });
+        map.addOverlay(fogOverlay);
+        
+        const updateFog = () => {
+          const size = map.getSize();
+          fogCanvas.width = size[0];
+          fogCanvas.height = size[1];
+          
+          // Заполняем чёрным с прозрачностью
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.fillRect(0, 0, fogCanvas.width, fogCanvas.height);
+          
+          // Вырезаем круги видимости для каждого персонажа (пример)
+          ctx.globalCompositeOperation = 'destination-out';
+          
+          // Получаем все маркеры персонажей (можно расширить логику)
+          vectorSource.getFeatures().forEach(f => {
+            if (f.get('type') === 'character') {
+              const coord = f.getGeometry().getCoordinates();
+              const pixel = map.getPixelFromCoordinate(coord);
+              if (pixel) {
+                const gradient = ctx.createRadialGradient(pixel[0], pixel[1], 0, pixel[0], pixel[1], 150);
+                gradient.addColorStop(0, 'rgba(0,0,0,1)');
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(pixel[0], pixel[1], 150, 0, Math.PI * 2);
+                ctx.fill();
+              }
+            }
+          });
+          
+          ctx.globalCompositeOperation = 'source-over';
+        };
+        
+        map.on('postrender', updateFog);
+        updateFog();
+      } else {
+        if (fogOverlay) {
+          map.removeOverlay(fogOverlay);
+          fogOverlay = null;
+        }
+      }
+    });
+
+    // ===== ГЕНЕРАТОР СЛУЧАЙНЫХ ВСТРЕЧ (D&D) =====
+    const encounterBtn = document.getElementById('encounter-btn');
+    const encounterPanel = document.getElementById('encounter-panel');
+    const encounterTerrainEl = document.getElementById('encounter-terrain');
+    const encounterResultEl = document.getElementById('encounter-result');
+    const encounterGenerateBtn = document.getElementById('encounter-generate');
+    const encounterCloseBtn = document.getElementById('encounter-close');
+    
+    const terrainTypes = ['Лес', 'Горы', 'Равнина', 'Болото', 'Пустыня', 'Подземелье', 'Вода'];
+    const encounters = {
+      'Лес': ['Гоблины (2d4)', 'Огр', 'Волки (1d6)', 'Энты', 'Пауки (1d4)', 'Друид'],
+      'Горы': ['Гарпии (1d4)', 'Каменный великан', 'Грифоны', 'Кобольды (2d6)', 'Дракон (молодой)'],
+      'Равнина': ['Орки (1d8)', 'Кентавры', 'Единорог', 'Всадники', 'Стадо бизонов'],
+      'Болото': ['Тролль', 'Виверна', 'Бурые слизни (2d4)', 'Ведьма', 'Зомби (1d6)'],
+      'Пустыня': ['Синий дракон', 'Гении', 'Анхег', 'Скорпионы (1d6)', 'Кочевники'],
+      'Подземелье': ['Нежить (2d6)', 'Тёмные эльфы', 'Мимик', 'Беholder', 'Двергары (1d8)'],
+      'Вода': ['Кракен', 'Сахагины (2d4)', 'Морской змей', 'Пираты', 'Тритоны']
+    };
+    
+    encounterBtn.addEventListener('click', () => {
+      encounterPanel.classList.toggle('visible');
+    });
+    
+    encounterCloseBtn.addEventListener('click', () => {
+      encounterPanel.classList.remove('visible');
+    });
+    
+    encounterGenerateBtn.addEventListener('click', () => {
+      // Определяем местность по координатам центра карты или случайным образом
+      const randomTerrain = terrainTypes[Math.floor(Math.random() * terrainTypes.length)];
+      encounterTerrainEl.textContent = `Местность: ${randomTerrain}`;
+      
+      // Генерируем встречу
+      const possibleEncounters = encounters[randomTerrain] || ['Странствующий торговец'];
+      const encounter = possibleEncounters[Math.floor(Math.random() * possibleEncounters.length)];
+      
+      // Бросок d20 для вариативности
+      const d20 = Math.floor(Math.random() * 20) + 1;
+      let modifier = '';
+      if (d20 <= 5) modifier = ' (слабая группа)';
+      else if (d20 >= 16) modifier = ' (усиленная группа!)';
+      
+      encounterResultEl.innerHTML = `<strong>🎲 d20: ${d20}</strong><br>${encounter}${modifier}`;
+    });
+
+    // ===== ПОГОДА (D&D) =====
+    const weatherBtn = document.getElementById('weather-btn');
+    const weatherOverlay = document.getElementById('weather-overlay');
+    const weatherEffects = ['clear', 'rain', 'fog', 'storm'];
+    let weatherIndex = 0;
+    
+    weatherBtn.addEventListener('click', () => {
+      weatherIndex = (weatherIndex + 1) % weatherEffects.length;
+      const effect = weatherEffects[weatherIndex];
+      
+      weatherOverlay.className = 'weather-overlay';
+      weatherBtn.classList.remove('active');
+      
+      if (effect !== 'clear') {
+        weatherOverlay.classList.add(effect);
+        weatherBtn.classList.add('active');
+      }
+      
+      // Сохраняем погоду в localStorage
+      try {
+        localStorage.setItem('noscape_weather', effect);
+      } catch (e) {}
+    });
+    
+    // Загружаем сохранённую погоду
+    try {
+      const savedWeather = localStorage.getItem('noscape_weather');
+      if (savedWeather && savedWeather !== 'clear') {
+        weatherOverlay.classList.add(savedWeather);
+        weatherBtn.classList.add('active');
+        weatherIndex = weatherEffects.indexOf(savedWeather);
+      }
+    } catch (e) {}
 
     // ===== ВЫВОД КООРДИНАТ ПРИ КЛИКЕ =====
     const coordsDiv = document.getElementById('coords');
